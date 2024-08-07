@@ -1,0 +1,197 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <chrono>
+#include <sys/stat.h>
+
+using namespace std;
+using namespace chrono;
+
+struct Player {
+    string name;
+    int score;
+};
+
+vector<vector<int>> board(4, vector<int>(4));
+int movesCount = 0;
+string playerName;
+vector<Player> players;
+
+void initializeBoard();
+void printBoard();
+bool makeMove(char direction);
+bool isSolved();
+void playGame();
+void showScores();
+void showCredits();
+void saveScore(const string& name, int score);
+vector<Player> loadScores();
+void shuffleBoard();
+void endGame(const string& message, int score);
+
+int main() {
+    cout << "Ingrese su nombre: ";
+    getline(cin, playerName);
+
+    int option;
+    bool exit = false;
+
+    while (!exit) {
+        cout << "1. Jugar\n2. Puntajes\n3. Salir\n4. Créditos\n";
+        cout << "Seleccione una opción: ";
+        cin >> option;
+
+        switch (option) {
+            case 1:
+                playGame();
+                break;
+            case 2:
+                showScores();
+                break;
+            case 3:
+                exit = true;
+                break;
+            case 4:
+                showCredits();
+                break;
+            default:
+                cout << "Opción inválida.\n";
+        }
+    }
+
+    return 0;
+}
+
+void initializeBoard() {
+    int n = 1;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++, n++) {
+            board[i][j] = n % 16;
+        }
+    }
+    shuffleBoard();
+}
+
+void shuffleBoard() {
+    srand(time(0));
+    for (int i = 0; i < 1000; i++) {
+        makeMove("wasd"[rand() % 4]);
+    }
+}
+
+void printBoard() {
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (board[i][j] == 0)
+                cout << "   ";
+            else
+                cout << board[i][j] << "\t";
+        }
+        cout << "\n";
+    }
+}
+
+bool makeMove(char direction) {
+    int dx = 0, dy = 0;
+    pair<int, int> emptySlot(-1, -1);
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            if (board[i][j] == 0) {
+                emptySlot = {i, j};
+                break;
+            }
+        }
+        if (emptySlot.first != -1) break;
+    }
+
+    switch (direction) {
+        case 'w': dx = 1; break;
+        case 's': dx = -1; break;
+        case 'a': dy = 1; break;
+        case 'd': dy = -1; break;
+    }
+
+    int nx = emptySlot.first + dx, ny = emptySlot.second + dy;
+    if (nx >= 0 && nx < 4 && ny >= 0 && ny < 4) {
+        swap(board[emptySlot.first][emptySlot.second], board[nx][ny]);
+        return true;
+    }
+    return false;
+}
+
+bool isSolved() {
+    int count = 1;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++, count++) {
+            if (board[i][j] != count % 16) return false;
+        }
+    }
+    return true;
+}
+
+void playGame() {
+    initializeBoard();
+    movesCount = 0;
+    auto startTime = steady_clock::now();
+    auto maxDuration = minutes(5);
+    char move;
+    bool solved = false;
+
+    while (!solved && steady_clock::now() - startTime < maxDuration) {
+        auto timeLeft = duration_cast<seconds>(maxDuration - (steady_clock::now() - startTime));
+        system("clear");
+        printBoard();
+        cout << "Tiempo restante: " << timeLeft.count() << " segundos\n";
+        cout << "movimientos: " << movesCount << endl;
+        cout << "Usa WASD  para mover. Presiona 'q' para salir." << endl;
+        cin >> move;
+        if (move == 'q') {
+            endGame("t. Tu puntuacion es 0.", 0);
+            break;
+        }
+        if (makeMove(move)) {
+            movesCount++;
+            solved = isSolved();
+        }
+    }
+
+    if (solved) {
+        cout << "Felicidades! resolviste el puzzle en " << movesCount << " movimientos.\n";
+        saveScore(playerName, movesCount);
+    } else if (steady_clock::now() - startTime >= maxDuration) {
+        endGame("Se acabó en tiempo! Tu puntación es 0.", 0);
+    }
+}
+
+void endGame(const string& message, int score) {
+    cout << message << endl;
+    saveScore(playerName, score);
+}
+
+void showScores() {
+    if (players.empty()) {
+        cout << "No hay puntuaciones aun.\n";
+        return;
+    }
+
+    sort(players.begin(), players.end(), [](const Player& a, const Player& b) {
+        return a.score < b.score;
+    });
+
+    for (const auto& player : players) {
+        cout << player.name << ": " << player.score << " puntos\n";
+    }
+}
+
+void showCredits() {
+    cout << "Hecho por: Avila Jhossua, Morales Ariel\n";
+}
+
+void saveScore(const string& name, int score) {
+    players.push_back({name, score});
+}
